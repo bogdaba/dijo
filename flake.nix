@@ -1,57 +1,76 @@
 {
   inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     utils.url = "github:numtide/flake-utils";
-    naersk.url = "github:nmattia/naersk";
-    mozillapkgs = {
-      url = "github:mozilla/nixpkgs-mozilla";
-      flake = false;
-    };
+    rust-overlay.url = "github:oxalica/rust-overlay";
   };
+  outputs =
+    {
+      self,
+      nixpkgs,
+      utils,
+      rust-overlay,
+    }:
+    utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ rust-overlay.overlays.default ];
+        };
 
-  outputs = { self, nixpkgs, utils, naersk, mozillapkgs }:
-  utils.lib.eachDefaultSystem (system: let
-    pkgs = nixpkgs.legacyPackages."${system}";
+        # Get the Rust toolchain
+        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
+          extensions = [
+            "rust-src"
+            "rust-analyzer"
+          ];
+        };
+      in
+      rec {
+        packages.dijo = pkgs.rustPlatform.buildRustPackage {
+          pname = "dijo";
+          version = "0.2.7";
+          src = ./.;
 
-      # Get a specific rust version
-      mozilla = pkgs.callPackage (mozillapkgs + "/package-set.nix") {};
-      rust = (mozilla.rustChannelOf {
-        date = "2020-12-23";
-        channel = "nightly";
-        sha256 = "LbKHsCOFXWpg/SEyACfzZuWjKbkXdH6EJKOPSGoO01E="; # set zeros after modifying channel or date
-      }).rust;
-      rust-src = (mozilla.rustChannelOf {
-        date = "2020-12-23";
-        channel = "nightly";
-        sha256 = "LbKHsCOFXWpg/SEyACfzZuWjKbkXdH6EJKOPSGoO01E="; # set zeros after modifying channel or date
-      }).rust-src;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
 
-      naersk-lib = naersk.lib."${system}".override {
-        cargo = rust;
-        rustc = rust;
-      };
-    in rec {
-      packages.my-project = naersk-lib.buildPackage {
-        pname = "dijo";
-        version = "0.2.7";
-        root = ./.;
-      };
-      defaultPackage = packages.my-project;
-      apps.my-project = utils.lib.mkApp {
-        drv = packages.my-project;
-      };
-      defaultApp = apps.my-project;
-      devShell = pkgs.mkShell {
-        nativeBuildInputs = [
-          rust
-          rust-src
-          pkgs.rust-analyzer
-          pkgs.cargo
-          pkgs.openssl
-          pkgs.ncurses
-        ];
-        shellHook = ''
-          export RUST_SRC_PATH="${rust-src}/lib/rustlib/src/rust/library"
-        '';
-      };
-    });
-  }
+          nativeBuildInputs = with pkgs; [
+            pkg-config
+          ];
+
+          buildInputs =
+            with pkgs;
+            [
+              openssl
+              ncurses
+            ]
+            ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+              pkgs.darwin.apple_sdk.frameworks.Security
+            ];
+        };
+
+        defaultPackage = packages.dijo;
+
+        apps.dijo = utils.lib.mkApp {
+          drv = packages.dijo;
+        };
+        defaultApp = apps.dijo;
+
+        devShell = pkgs.mkShell {
+          nativeBuildInputs = with pkgs; [
+            rustToolchain
+            pkg-config
+            openssl
+            ncurses
+          ];
+
+          shellHook = ''
+            export RUST_SRC_PATH="${rustToolchain}/lib/rustlib/src/rust/library"
+          '';
+        };
+      }
+    );
+}
