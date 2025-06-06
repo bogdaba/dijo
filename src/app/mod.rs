@@ -1,7 +1,8 @@
 use std::default::Default;
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
 
-use notify::{DebouncedEvent, RecommendedWatcher};
+use notify::{Event, RecommendedWatcher};
 
 use crate::habit::HabitWrapper;
 
@@ -19,7 +20,7 @@ pub struct App {
     habits: Vec<Box<dyn HabitWrapper>>,
 
     _file_watcher: RecommendedWatcher,
-    file_event_recv: Receiver<DebouncedEvent>,
+    file_event_recv: Arc<Mutex<Receiver<Result<Event, notify::Error>>>>,
     focus: usize,
     cursor: Cursor,
     message: Message,

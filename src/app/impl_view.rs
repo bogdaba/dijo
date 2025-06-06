@@ -8,7 +8,7 @@ use cursive::event::{Event, EventResult, Key};
 use cursive::theme::Color;
 use cursive::view::{CannotFocus, View};
 use cursive::{Printer, Vec2};
-use notify::DebouncedEvent;
+use notify::EventKind;
 
 use crate::app::{App, MessageKind};
 use crate::habit::{HabitWrapper, ViewMode};
@@ -58,8 +58,8 @@ impl View for App {
     }
 
     fn on_event(&mut self, e: Event) -> EventResult {
-        match self.file_event_recv.try_recv() {
-            Ok(DebouncedEvent::Write(_)) => {
+        match self.file_event_recv.lock().unwrap().try_recv() {
+            Ok(Ok(event)) if matches!(event.kind, EventKind::Modify(_)) => {
                 let read_from_file = |file: PathBuf| -> Vec<Box<dyn HabitWrapper>> {
                     if let Ok(ref mut f) = File::open(file) {
                         let mut j = String::new();

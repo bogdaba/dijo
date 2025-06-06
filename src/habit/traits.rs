@@ -19,7 +19,9 @@ pub trait Habit {
     fn name(&self) -> String;
     fn reached_goal(&self, date: NaiveDate) -> bool;
     fn remaining(&self, date: NaiveDate) -> u32;
+    #[allow(dead_code)]
     fn set_goal(&mut self, goal: Self::HabitType);
+    #[allow(dead_code)]
     fn set_name(&mut self, name: impl AsRef<str>);
     fn kind(&self) -> GoalKind;
 
@@ -30,7 +32,7 @@ pub trait Habit {
 }
 
 #[typetag::serde(tag = "type")]
-pub trait HabitWrapper: erased_serde::Serialize {
+pub trait HabitWrapper: erased_serde::Serialize + Send + Sync {
     fn draw(&self, printer: &Printer);
     fn goal(&self) -> u32;
     fn kind(&self) -> GoalKind;

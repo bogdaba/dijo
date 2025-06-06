@@ -3,13 +3,13 @@ use std::f64;
 use std::fs::{File, OpenOptions};
 use std::io::prelude::*;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::channel;
-use std::time::Duration;
 
 use chrono::{Local, NaiveDate};
 use cursive::direction::Absolute;
 use cursive::Vec2;
-use notify::{watcher, RecursiveMode, Watcher};
+use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use crate::command::{Command, CommandLineError, GoalKind};
 use crate::habit::{Bit, Count, Float, HabitWrapper, TrackEvent, ViewMode};
@@ -20,13 +20,13 @@ use crate::app::{App, Cursor, Message, MessageKind, StatusLine};
 impl App {
     pub fn new() -> Self {
         let (tx, rx) = channel();
-        let mut watcher = watcher(tx, Duration::from_secs(1)).unwrap();
-        watcher.watch(utils::auto_habit_file(), RecursiveMode::Recursive);
+        let mut watcher = recommended_watcher(tx).unwrap();
+        watcher.watch(&utils::auto_habit_file(), RecursiveMode::Recursive).unwrap();
         return App {
             habits: vec![],
             focus: 0,
             _file_watcher: watcher,
-            file_event_recv: rx,
+            file_event_recv: Arc::new(Mutex::new(rx)),
             cursor: Cursor::new(),
             message: Message::startup(),
         };
